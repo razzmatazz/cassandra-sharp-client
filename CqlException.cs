@@ -9,6 +9,11 @@ namespace Apache.Cassandra.Cql
 			: base(msg)
 		{
 		}
+
+		public CqlException(string msg, Exception inner)
+			: base(msg, inner)
+		{
+		}
 	}
 }
 

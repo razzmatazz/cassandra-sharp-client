@@ -4,18 +4,20 @@ using System.Data.Common;
 
 namespace Apache.Cassandra.Cql
 {
-	class CassandraConnectionConfiguration
+	class CqlConnectionConfiguration
 	{
+		public readonly ushort DEFAULT_CASSANDRA_PORT = 9160;
+
 		public string Host { get; set; }
 		public ushort Port { get; set; }
 		public string DefaultKeyspace { get; set; }
 		public string ConnectionString { get; set; }
 		public int Timeout { get; set; }
 		
-		public CassandraConnectionConfiguration()
+		public CqlConnectionConfiguration()
 		{
 			Host = "";
-			Port = 7160;
+			Port = DEFAULT_CASSANDRA_PORT;
 			DefaultKeyspace = "";
 			ConnectionString = "";
 			Timeout = 0;
@@ -26,7 +28,7 @@ namespace Apache.Cassandra.Cql
 			object val;
 			builder.TryGetValue("Source", out val);
 			if (val == null)
-				throw new CassandraException("no \"Source\" param specified in connection string");
+				throw new CqlException("no \"Source\" param specified in connection string");
 
 			string source = val as string;
 			if (source.Contains(":"))
@@ -35,15 +37,15 @@ namespace Apache.Cassandra.Cql
 
 				ushort port;
 				if (!ushort.TryParse(parts[1], out port))
-					throw new CassandraException("cannot parse Source param: port number is not parsable");
+					throw new CqlException("cannot parse Source param: port number is not parsable");
 
 				Host = parts[0];
-				Port = Port;
+				Port = port;
 			}
 			else
 			{
 				Host = source;
-				Port = 7160;
+				Port = DEFAULT_CASSANDRA_PORT;
 			}
 		}
 		
@@ -64,17 +66,17 @@ namespace Apache.Cassandra.Cql
 		{
 			// TODO: a more elaborate checking is needed here
 			if (keyspace == "")
-				throw new CassandraException("keyspace name \"" + keyspace + "\" is not valid");
+				throw new CqlException("keyspace name \"" + keyspace + "\" is not valid");
 			
 			return keyspace;
 		}
 		
-		public static CassandraConnectionConfiguration FromConnectionString(string connString)
+		public static CqlConnectionConfiguration FromConnectionString(string connString)
 		{
 			var builder = new DbConnectionStringBuilder();
 			builder.ConnectionString = connString;
-			
-			var config = new CassandraConnectionConfiguration();
+
+			var config = new CqlConnectionConfiguration();
 			config.ParseDefaultKeyspace(builder);
 			config.ParseEndpoints(builder);
 			

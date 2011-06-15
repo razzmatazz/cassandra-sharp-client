@@ -3,18 +3,40 @@ using System.Data;
 
 namespace Apache.Cassandra.Cql
 {
-	public class CassandraCommand: IDbCommand
+	public class CqlCommand: IDbCommand
 	{
-		private CassandraConnection _Connection;
+		private string _CommandText;
+		private CqlConnection _Connection;
 
-		public CassandraCommand(CassandraConnection connection)
+		public CqlCommand()
 		{
+
+		}
+
+		public CqlCommand(string commandText)
+		{
+			_CommandText = commandText;
+		}
+
+		public CqlCommand(string commandText, CqlConnection connection)
+		{
+			_CommandText = commandText;
 			_Connection = connection;
+		}
+
+		private void EnsureWeHaveQueryAndConnection()
+		{
+			if (_CommandText == null)
+				throw new CqlException("CommandText is not set on command");
+
+			if (_Connection == null)
+				throw new CqlException("connection is not set on command");
 		}
 
 		public void Cancel ()
 		{
-			throw new NotImplementedException ();
+			// TODO: cancel is supported or not?
+			// nop
 		}
 
 		public IDbDataParameter CreateParameter ()
@@ -27,9 +49,11 @@ namespace Apache.Cassandra.Cql
 			throw new NotImplementedException ();
 		}
 
-		public IDataReader ExecuteReader ()
+		public IDataReader ExecuteReader()
 		{
-			throw new NotImplementedException ();
+			EnsureWeHaveQueryAndConnection();
+
+			return _Connection.ActualConnection.ExecuteQueryWithReader(_CommandText);
 		}
 
 		public IDataReader ExecuteReader (CommandBehavior behavior)
@@ -49,10 +73,10 @@ namespace Apache.Cassandra.Cql
 
 		public string CommandText {
 			get {
-				throw new NotImplementedException ();
+				return _CommandText;
 			}
 			set {
-				throw new NotImplementedException ();
+				_CommandText = value;
 			}
 		}
 

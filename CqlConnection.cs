@@ -1,31 +1,34 @@
 using System;
 using System.Data;
-using Thrift.Protocol;
-using Thrift.Transport;
+using Apache.Cassandra.Cql.Internal;
 
 namespace Apache.Cassandra.Cql
 {
-	public class CassandraConnection: IDbConnection
+	public class CqlConnection : IDbConnection
 	{
-		private Apache.Cassandra.Cassandra.Client _Client;
-
+		private ActualCqlConnection _ActualConnection;
 		private ConnectionState _ConnectionState;
-		private CassandraConnectionConfiguration _Config;
+		private CqlConnectionConfiguration _Config;
 		private string _CurrentKeyspace;
 		private int _ConnectionTimeout; // TODO: not used for now
 
-		public CassandraConnection()
+		internal ActualCqlConnection ActualConnection {
+			get { return _ActualConnection; }
+		}
+
+		public CqlConnection()
 		{
 			_ConnectionState = ConnectionState.Closed;
-			_Config = new CassandraConnectionConfiguration();
+			_Config = new CqlConnectionConfiguration();
 			_CurrentKeyspace = "";
 			_ConnectionTimeout = 0;
+			_ActualConnection = null;
 		}
 		
 		public IDbTransaction BeginTransaction()
 		{
 			EnsureConnected();
-			throw new CassandraException("transactions are not supported");
+			throw new CqlException("transactions are not supported");
 		}
 
 		public IDbTransaction BeginTransaction (IsolationLevel il)
@@ -36,38 +39,35 @@ namespace Apache.Cassandra.Cql
 		public void ChangeDatabase (string databaseName)
 		{
 			EnsureConnected();
-			_CurrentKeyspace = CassandraConnectionConfiguration.EnsureKeyspaceNameIsValid(databaseName);
+			_CurrentKeyspace = CqlConnectionConfiguration.EnsureKeyspaceNameIsValid(databaseName);
 		}
 
 		public void Close ()
 		{
-			// TODO: close connection
+			if (_ConnectionState == ConnectionState.Closed)
+				return;
+
+			// TODO: connection pool
+			_ActualConnection.Disconnect();
+			_ActualConnection = null;
 		}
 
 		public IDbCommand CreateCommand ()
 		{
 			EnsureConnected();
-			return new CassandraCommand(this);
+			return new CqlCommand() { Connection = this };
 		}
 
 		public void Open ()
 		{
+			// TODO: connection pool
+
 			if (_ConnectionState != ConnectionState.Closed)
-				throw new CassandraException("already connected");
+				throw new CqlException("already connected");
 
-			TTransport transport = null;
-            if (_Config.Timeout == 0)
-            {
-                transport = new TSocket(_Config.Host, _Config.Port);
-            }
-            else
-            {
-                transport = new TSocket(_Config.Host, _Config.Port, _Config.Timeout);
-            }
-            TProtocol protocol = new TBinaryProtocol(transport);
-            _Client = new Cassandra.Client(protocol);
-
-			// TODO
+			_ActualConnection = new ActualCqlConnection(_Config);
+			_ActualConnection.Connect();
+			_ConnectionState = ConnectionState.Open;
 		}
 
 		public string ConnectionString {
@@ -76,7 +76,7 @@ namespace Apache.Cassandra.Cql
 			}
 			set {
 				EnsureNotConnected();
-				_Config = CassandraConnectionConfiguration.FromConnectionString(value);
+				_Config = CqlConnectionConfiguration.FromConnectionString(value);
 			}
 		}
 
@@ -107,13 +107,13 @@ namespace Apache.Cassandra.Cql
 		private void EnsureConnected()
 		{
 			if (_ConnectionState == ConnectionState.Closed)
-				throw new CassandraException("connection is closed");
+				throw new CqlException("connection is closed");
 		}
 
 		private void EnsureNotConnected()
 		{
 			if (_ConnectionState != ConnectionState.Closed)
-				throw new CassandraException("connection is open");
+				throw new CqlException("connection is open");
 		}
 	}
 }
