@@ -6,37 +6,37 @@ using System.Data;
 
 namespace Apache.Cassandra.Cql.Internal.Marshal
 {
-	class BytesType: IMarshaller
+	class AsciiType: IMarshaller
 	{
 		public byte[] Marshall(object obj)
 		{
-			return (byte[])obj;
+			return Encoding.ASCII.GetBytes(Convert.ToString(obj));
 		}
 
 		public object Unmarshall(byte[] bytes)
 		{
-			return bytes;
+			return Encoding.ASCII.GetString(bytes);
 		}
+
 
 		public Type MarshalledType
 		{
-			get { return typeof(byte[]); }
+			get { return typeof(string); }
 		}
 
 		public string CassandraTypeName
 		{
-			get { return "org.apache.cassandra.db.marshal.BytesType"; }
+			get { return "org.apache.cassandra.db.marshal.AsciiType"; }
 		}
 
 		public DbType DbType
 		{
-			get { return DbType.Binary; }
+			get { return DbType.AnsiString; }
 		}
 
 		public string MarshallToCqlParamValue(object obj)
 		{
-			// TODO: how to marshall bytes to cql query string?!
-			return "\"\"";
+			return "\"" + ((string)obj).Replace("\"", "\\\"") + "\"";
 		}
 	}
 }

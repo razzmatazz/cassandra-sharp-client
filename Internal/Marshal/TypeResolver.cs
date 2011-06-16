@@ -32,11 +32,11 @@ namespace Apache.Cassandra.Cql.Internal.Marshal
 		private static TypeDescription[] TypeDescriptions = {
 			new TypeDescription() {
 				Type = CassandraType.Ascii,
-				Marshaller = new AsciiTypeMarshaller()
+				Marshaller = new AsciiType()
 			},
 			new TypeDescription() {
 				Type = CassandraType.UTF8,
-				Marshaller = new Utf8TypeMarshaller()
+				Marshaller = new Utf8Type()
 			},
 			new TypeDescription() {
 				Type = CassandraType.Bytes,
@@ -44,7 +44,17 @@ namespace Apache.Cassandra.Cql.Internal.Marshal
 			}
 		};
 
-		public static IMarshaller GetMarshallerForName(string name)
+		public static IMarshaller GetMarshalledTypeForObject(object value)
+		{
+			return TypeDescriptions.Where(td => td.Marshaller.MarshalledType == value.GetType()).Select(td => td.Marshaller).FirstOrDefault();
+		}
+
+		public static bool IsNativeTypeMarshalled(Type type)
+		{
+			return TypeDescriptions.Any(td => td.Marshaller.MarshalledType == type);
+		}
+
+		public static IMarshaller GetMarshalledTypeForName(string name)
 		{
 			return GetTypeDescriptionForName(name).Marshaller;
 		}

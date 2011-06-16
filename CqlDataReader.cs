@@ -5,16 +5,18 @@ using System.Text;
 using System.Data;
 using Apache.Cassandra.Cql.Internal;
 using Apache.Cassandra.Cql.Internal.Marshal;
+using System.Data.Common;
 
 namespace Apache.Cassandra.Cql
 {
-	public class CqlDataReader: IDataReader
+	public class CqlDataReader: DbDataReader
 	{
-		private ActualCqlConnection _Connection;
+		private CqlConnection _Connection;
 		private CqlResult _CqlResult;
 		private bool _Closed;
 		private int _RowIter;
 		private ColumnFamilyMetadata _Cf;
+		private CommandBehavior _CmdBehaviour;
 
 		private CqlRow CurrentRow
 		{
@@ -25,25 +27,34 @@ namespace Apache.Cassandra.Cql
 			}
 		}
 
-		internal CqlDataReader(CqlResult cqlResult, ActualCqlConnection connection, ColumnFamilyMetadata md)
+		internal CqlDataReader(CqlResult cqlResult, CqlConnection connection, ColumnFamilyMetadata md, CommandBehavior cmdBehaviour)
 		{
 			_CqlResult = cqlResult;
 			_Connection = connection;
 			_RowIter = -1;
 			_Cf = md;
+			_CmdBehaviour = cmdBehaviour;
 
 			// TODO support super column families
 			if (md.FamilyType == ColumnFamilyMetadata.ColumnFamilyType.Super)
 				throw new NotImplementedException("super column families are not supported yet");
 
-			if (!_CqlResult.__isset.rows || _CqlResult.Type != CqlResultType.ROWS)
-				throw new CqlException("non-scalar query has returned a result of non-ROWS type");
+			if ((cmdBehaviour & CommandBehavior.SchemaOnly) == 0)
+			{
+				if (!_CqlResult.__isset.rows || _CqlResult.Type != CqlResultType.ROWS)
+					throw new CqlException("non-scalar query has returned a result of non-ROWS type");
+			}
 		}
 
-		public void Close()
+		public override void Close()
 		{
-			_Closed = true;
-			// nop
+			if (!_Closed)
+			{
+				_Closed = true;
+
+				if ((_CmdBehaviour & CommandBehavior.CloseConnection) == CommandBehavior.CloseConnection)
+					_Connection.Close();
+			}
 		}
 
 		private void EnsureNotClosed()
@@ -56,11 +67,15 @@ namespace Apache.Cassandra.Cql
 		{
 			EnsureNotClosed();
 
-			if (_RowIter == _CqlResult.Rows.Count)
+			if (_CqlResult == null
+					|| _RowIter == _CqlResult.Rows.Count
+					|| (_RowIter == 1 && ((_CmdBehaviour & CommandBehavior.SingleRow) == CommandBehavior.SingleRow)))
+			{
 				throw new InvalidOperationException("CqlDataReader is at the end of result set");
+			}
 		}
 
-		public int Depth
+		public override int Depth
 		{
 			get {
 				// TODO: as Cassandra support hierarchical queries, this would be nice to expose on Super type CF
@@ -69,7 +84,7 @@ namespace Apache.Cassandra.Cql
 			}
 		}
 
-		public DataTable GetSchemaTable()
+		public override DataTable GetSchemaTable()
 		{
 			EnsureNotClosed();
 
@@ -77,54 +92,56 @@ namespace Apache.Cassandra.Cql
 			throw new NotImplementedException();
 		}
 
-		public bool IsClosed
+		public override bool IsClosed
 		{
 			get { return _Closed; }
 		}
 
-		public bool NextResult()
+		public override bool NextResult()
 		{
 			EnsureNotClosed();
 
+			if (_CqlResult == null)
+				return false;
+
 			if (_RowIter == _CqlResult.Rows.Count - 1)
+				return false;
+
+			if (_RowIter == 1 && ((_CmdBehaviour & CommandBehavior.SingleRow) == CommandBehavior.SingleRow))
 				return false;
 
 			_RowIter += 1;
 			return true;
 		}
 
-		public bool Read()
+		public override bool Read()
 		{
 			EnsureNotAtTheEnd();
 			return true;
 		}
 
-		public int RecordsAffected
+		public override int RecordsAffected
 		{
 			get {
 				EnsureNotClosed();
 
-				throw new NotImplementedException();
+				// cassandra select queries never affect data store
+				return 0;
 			}
 		}
 
-		public void Dispose()
-		{
-			Close();
-		}
-
-		public int FieldCount
+		public override int FieldCount
 		{
 			get { return CurrentRow.Columns.Count; }
 		}
 
-		public bool GetBoolean(int i)
+		public override bool GetBoolean(int i)
 		{
 			// TODO: add more heuristics here
 			return Convert.ToBoolean(GetValue(i));
 		}
 
-		public byte GetByte(int i)
+		public override byte GetByte(int i)
 		{
 			if (_Cf.ColumnValueType == TypeResolver.CassandraType.Bytes)
 				return CurrentRow.Columns[i].Value[0];
@@ -134,7 +151,7 @@ namespace Apache.Cassandra.Cql
 			}
 		}
 
-		public long GetBytes(int i, long fieldOffset, byte[] buffer, int bufferoffset, int length)
+		public override long GetBytes(int i, long fieldOffset, byte[] buffer, int bufferoffset, int length)
 		{
 			var colValue = CurrentRow.Columns[i].Value;
 			long len = Math.Max(length, colValue.Length);
@@ -142,12 +159,12 @@ namespace Apache.Cassandra.Cql
 			return len;
 		}
 
-		public char GetChar(int i)
+		public override char GetChar(int i)
 		{
 			return GetString(i)[0];
 		}
 
-		public long GetChars(int i, long fieldoffset, char[] buffer, int bufferoffset, int length)
+		public override long GetChars(int i, long fieldoffset, char[] buffer, int bufferoffset, int length)
 		{
 			string str = GetString(i);
 			long len = Math.Max(str.Length, length);
@@ -155,47 +172,39 @@ namespace Apache.Cassandra.Cql
 			return len;
 		}
 
-		public IDataReader GetData(int i)
-		{
-			EnsureNotAtTheEnd();
-
-			// TODO: support for multicolumns
-			throw new NotImplementedException();
-		}
-
-		public string GetDataTypeName(int i)
+		public override string GetDataTypeName(int i)
 		{
 			return _Cf.ColumnValueMarshaller.CassandraTypeName;
 		}
 
-		public DateTime GetDateTime(int i)
+		public override DateTime GetDateTime(int i)
 		{
 			// TODO: handle TimeUUID properly
 			// TODO: which is the most populare datetime format?
 			return DateTime.Parse(GetString(i));
 		}
 
-		public decimal GetDecimal(int i)
+		public override decimal GetDecimal(int i)
 		{
 			return Convert.ToDecimal(GetValue(i));
 		}
 
-		public double GetDouble(int i)
+		public override double GetDouble(int i)
 		{
 			return (float)Convert.ToDouble(GetValue(i));
 		}
 
-		public Type GetFieldType(int i)
+		public override Type GetFieldType(int i)
 		{
 			return _Cf.ColumnValueMarshaller.MarshalledType;
 		}
 
-		public float GetFloat(int i)
+		public override float GetFloat(int i)
 		{
 			return (float)GetDouble(i);
 		}
 
-		public Guid GetGuid(int i)
+		public override Guid GetGuid(int i)
 		{
 			if (_Cf.ColumnValueType == TypeResolver.CassandraType.LexicalUUID
 					|| _Cf.ColumnValueType == TypeResolver.CassandraType.TimeUUID
@@ -209,43 +218,43 @@ namespace Apache.Cassandra.Cql
 			};
 		}
 
-		public short GetInt16(int i)
+		public override short GetInt16(int i)
 		{
 			return Convert.ToInt16(GetValue(i));
 		}
 
-		public int GetInt32(int i)
+		public override int GetInt32(int i)
 		{
 			return Convert.ToInt32(GetValue(i));
 		}
 
-		public long GetInt64(int i)
+		public override long GetInt64(int i)
 		{
 			return Convert.ToInt64(GetValue(i));
 		}
 
-		public string GetName(int i)
+		public override string GetName(int i)
 		{
 			return Convert.ToString(_Cf.ColumnNameMarshaller.Unmarshall(CurrentRow.Columns[i].Name));
 		}
 
-		public int GetOrdinal(string name)
+		public override int GetOrdinal(string name)
 		{
 			return _GetColumnNumByName(_Cf.ColumnNameMarshaller.Marshall(name));
 		}
 
-		public string GetString(int i)
+		public override string GetString(int i)
 		{
 			return Convert.ToString(GetValue(i));
 		}
 
-		public object GetValue(int i)
+		public override object GetValue(int i)
 		{
 			var marshaller = (i == 0) ? _Cf.KeyMarshaller : _Cf.ColumnValueMarshaller;
 			return marshaller.Unmarshall(CurrentRow.Columns[i].Value);
 		}
 
-		public int GetValues(object[] values)
+		public override int GetValues(object[] values)
 		{
 			object[] ourValues = CurrentRow.Columns.Select(c => _Cf.ColumnValueMarshaller.Unmarshall(c.Value)).ToArray();
 
@@ -254,13 +263,13 @@ namespace Apache.Cassandra.Cql
 			return len;
 		}
 
-		public bool IsDBNull(int i)
+		public override bool IsDBNull(int i)
 		{
 			EnsureNotAtTheEnd();
 			return false; 			// TODO: columns are never DBNull, dunno if this is right?
 		}
 
-		public object this[string name]
+		public override object this[string name]
 		{
 			get
 			{
@@ -268,7 +277,7 @@ namespace Apache.Cassandra.Cql
 			}
 		}
 
-		public object this[int i]
+		public override object this[int i]
 		{
 			get
 			{
@@ -292,7 +301,17 @@ namespace Apache.Cassandra.Cql
 					return i;
 			}
 
-			throw new CqlException("column in a row could not be resolved by name");
+			throw new IndexOutOfRangeException("No column with the specified name was found");
+		}
+
+		public override System.Collections.IEnumerator GetEnumerator()
+		{
+			throw new NotImplementedException();
+		}
+
+		public override bool HasRows
+		{
+			get { throw new NotImplementedException(); }
 		}
 	}
 }

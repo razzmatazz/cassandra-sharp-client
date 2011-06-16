@@ -1,140 +1,181 @@
 using System;
 using System.Data;
+using Apache.Cassandra.Cql.Internal;
+using System.Data.Common;
 
 namespace Apache.Cassandra.Cql
 {
-	public class CqlCommand: IDbCommand
+	public class CqlCommand: DbCommand
 	{
-		private string _CommandText;
 		private CqlConnection _Connection;
+		private Statement _Statement;
+		private bool _DesignTimeVisible;
+		private CqlParameterCollection _DbParams;
 
 		public CqlCommand()
 		{
-
+			_DesignTimeVisible = true;
+			_DbParams = new CqlParameterCollection();
 		}
 
-		public CqlCommand(string commandText)
+		public CqlCommand(CqlConnection connection)
+			: this()
 		{
-			_CommandText = commandText;
-		}
-
-		public CqlCommand(string commandText, CqlConnection connection)
-		{
-			_CommandText = commandText;
 			_Connection = connection;
 		}
 
-		private void EnsureWeHaveQueryAndConnection()
+		public CqlCommand(string commandText)
+			: this()
 		{
-			if (_CommandText == null)
-				throw new CqlException("CommandText is not set on command");
-
-			if (_Connection == null)
-				throw new CqlException("connection is not set on command");
+			_Statement = new Statement(commandText);
 		}
 
-		public void Cancel ()
+		public CqlCommand(string commandText, CqlConnection connection)
+			: this(commandText)
 		{
-			// TODO: cancel is supported or not?
-			// nop
+			_Connection = connection;
 		}
 
-		public IDbDataParameter CreateParameter ()
+		public override void Cancel()
 		{
-			throw new NotImplementedException ();
+			throw new NotSupportedException("Cassandra client does not support canceling on a query");
 		}
 
-		public int ExecuteNonQuery ()
+		public override string CommandText
 		{
-			throw new NotImplementedException ();
+			get
+			{
+				return _Statement.CommandText;
+			}
+			set
+			{
+				_Statement = new Statement(value);
+			}
 		}
 
-		public IDataReader ExecuteReader()
+		public override int CommandTimeout
 		{
-			EnsureWeHaveQueryAndConnection();
-
-			return _Connection.ActualConnection.ExecuteQueryWithReader(_CommandText);
+			// TODO: what about CommandTimeout
+			get 
+			{ 
+				throw new NotImplementedException(); 
+			}
+			  set 
+			{ 
+				throw new NotImplementedException(); 
+			}
 		}
 
-		public IDataReader ExecuteReader (CommandBehavior behavior)
+
+		public override CommandType CommandType
 		{
-			throw new NotImplementedException ();
+			get
+			{
+				return CommandType.Text;
+			}
+			set
+			{
+				if (value != CommandType.Text)
+					throw new CqlException("CqlCommmand.CommandType can only be CommandType.Text");
+			}
 		}
 
-		public object ExecuteScalar ()
+		protected override DbParameter CreateDbParameter()
 		{
-			throw new NotImplementedException ();
+			// TODO: implement CreateDbParameter
+ 			throw new NotImplementedException();
 		}
 
-		public void Prepare ()
+		protected override DbParameterCollection  DbParameterCollection
 		{
-			throw new NotImplementedException ();
+			get { return _DbParams; }
 		}
 
-		public string CommandText {
-			get {
-				return _CommandText;
-			}
-			set {
-				_CommandText = value;
-			}
-		}
-
-		public int CommandTimeout {
-			get {
-				throw new NotImplementedException ();
-			}
-			set {
-				throw new NotImplementedException ();
-			}
-		}
-
-		public CommandType CommandType {
-			get {
-				throw new NotImplementedException ();
-			}
-			set {
-				throw new NotImplementedException ();
-			}
-		}
-
-		public IDbConnection Connection {
-			get {
-				throw new NotImplementedException ();
-			}
-			set {
-				throw new NotImplementedException ();
-			}
-		}
-
-		public IDataParameterCollection Parameters {
-			get {
-				throw new NotImplementedException ();
-			}
-		}
-
-		public IDbTransaction Transaction {
-			get {
-				throw new NotImplementedException ();
-			}
-			set {
-				throw new NotImplementedException ();
-			}
-		}
-
-		public UpdateRowSource UpdatedRowSource {
-			get {
-				throw new NotImplementedException ();
-			}
-			set {
-				throw new NotImplementedException ();
-			}
-		}
-
-		public void Dispose ()
+		public override bool DesignTimeVisible
 		{
-			throw new NotImplementedException ();
+			get { return _DesignTimeVisible; }
+			set { _DesignTimeVisible = value; }
+		}
+
+		protected override DbDataReader ExecuteDbDataReader(CommandBehavior behavior)
+		{
+			EnsureWeHaveCommandTextAndConnection();
+			return _Connection.ActualConnection.ExecuteStatementWithReader(_Connection, _Statement, behavior, _DbParams);
+		}
+
+		public override int  ExecuteNonQuery()
+		{
+			EnsureWeHaveCommandTextAndConnection();
+			return _Connection.ActualConnection.ExecuteNonQueryStatement(_Connection, _Statement, _DbParams);
+		}
+
+		public override object  ExecuteScalar()
+		{
+			EnsureWeHaveCommandTextAndConnection();
+
+			using (var reader = _Connection.ActualConnection.ExecuteStatementWithReader(_Connection, _Statement, CommandBehavior.SingleRow, _DbParams))
+			{
+				if (!reader.NextResult())
+					throw new CqlException("no records returned for the query to extract scalar from");
+
+				if (reader.FieldCount == 0)
+					throw new CqlException("first row from results of the query has no columns returned");
+
+				return reader[0];
+			}
+		}
+
+		public override void  Prepare()
+		{
+ 			throw new NotImplementedException();
+		}
+
+		public override UpdateRowSource  UpdatedRowSource
+		{
+			// TODO: check what is UpdatedRowSource actually
+			  get 
+			{ 
+				throw new NotImplementedException(); 
+			}
+			  set 
+			{ 
+				throw new NotImplementedException(); 
+			}
+		}
+
+		private void EnsureWeHaveCommandTextAndConnection()
+		{
+			if (_Statement == null)
+				throw new CqlException("CommandText is not set on CqlCommand");
+
+			if (_Connection == null || _Connection.State == ConnectionState.Closed)
+				throw new InvalidOperationException("connection is not set on CqlCommand");
+		}
+
+		protected override DbConnection DbConnection
+		{
+			get
+			{
+				return _Connection;
+			}
+			set
+			{
+				_Connection = (CqlConnection)value;
+			}
+		}
+
+		protected override DbTransaction DbTransaction
+		{
+			get
+			{
+				return null;
+			}
+			set
+			{
+				throw new NotSupportedException("cassandra cql client does not support exceptions");
+			}
 		}
 	}
+
 }
 
