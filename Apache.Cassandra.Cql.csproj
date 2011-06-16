@@ -1,5 +1,5 @@
-<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="3.5" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
@@ -10,6 +10,26 @@
     <RootNamespace>Apache.Cassandra.Client</RootNamespace>
     <AssemblyName>Apache.Cassandra.Client</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <FileUpgradeFlags>
+    </FileUpgradeFlags>
+    <UpgradeBackupLocation>
+    </UpgradeBackupLocation>
+    <OldToolsVersion>3.5</OldToolsVersion>
+    <PublishUrl>publish\</PublishUrl>
+    <Install>true</Install>
+    <InstallFrom>Disk</InstallFrom>
+    <UpdateEnabled>false</UpdateEnabled>
+    <UpdateMode>Foreground</UpdateMode>
+    <UpdateInterval>7</UpdateInterval>
+    <UpdateIntervalUnits>Days</UpdateIntervalUnits>
+    <UpdatePeriodically>false</UpdatePeriodically>
+    <UpdateRequired>false</UpdateRequired>
+    <MapFileExtensions>true</MapFileExtensions>
+    <ApplicationRevision>0</ApplicationRevision>
+    <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
+    <IsWebBootstrapper>false</IsWebBootstrapper>
+    <UseApplicationTrust>false</UseApplicationTrust>
+    <BootstrapperEnabled>true</BootstrapperEnabled>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -20,6 +40,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <ConsolePause>false</ConsolePause>
+    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>none</DebugType>
@@ -28,17 +49,131 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <ConsolePause>false</ConsolePause>
+    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Data" />
+    <Reference Include="System.XML" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Apache\Cassandra\AuthenticationException.cs" />
+    <Compile Include="Apache\Cassandra\AuthenticationRequest.cs" />
+    <Compile Include="Apache\Cassandra\AuthorizationException.cs" />
+    <Compile Include="Apache\Cassandra\Cassandra.cs" />
+    <Compile Include="Apache\Cassandra\CfDef.cs" />
+    <Compile Include="Apache\Cassandra\Column.cs" />
+    <Compile Include="Apache\Cassandra\ColumnDef.cs" />
+    <Compile Include="Apache\Cassandra\ColumnOrSuperColumn.cs" />
+    <Compile Include="Apache\Cassandra\ColumnParent.cs" />
+    <Compile Include="Apache\Cassandra\ColumnPath.cs" />
+    <Compile Include="Apache\Cassandra\Compression.cs" />
+    <Compile Include="Apache\Cassandra\ConsistencyLevel.cs" />
+    <Compile Include="Apache\Cassandra\Constants.cs" />
+    <Compile Include="Apache\Cassandra\CounterColumn.cs" />
+    <Compile Include="Apache\Cassandra\CounterSuperColumn.cs" />
+    <Compile Include="Apache\Cassandra\CqlResult.cs" />
+    <Compile Include="Apache\Cassandra\CqlResultType.cs" />
+    <Compile Include="Apache\Cassandra\CqlRow.cs" />
+    <Compile Include="Apache\Cassandra\Deletion.cs" />
+    <Compile Include="Apache\Cassandra\IndexClause.cs" />
+    <Compile Include="Apache\Cassandra\IndexExpression.cs" />
+    <Compile Include="Apache\Cassandra\IndexOperator.cs" />
+    <Compile Include="Apache\Cassandra\IndexType.cs" />
+    <Compile Include="Apache\Cassandra\InvalidRequestException.cs" />
+    <Compile Include="Apache\Cassandra\KeyCount.cs" />
+    <Compile Include="Apache\Cassandra\KeyRange.cs" />
+    <Compile Include="Apache\Cassandra\KeySlice.cs" />
+    <Compile Include="Apache\Cassandra\KsDef.cs" />
+    <Compile Include="Apache\Cassandra\Mutation.cs" />
+    <Compile Include="Apache\Cassandra\NotFoundException.cs" />
+    <Compile Include="Apache\Cassandra\SchemaDisagreementException.cs" />
+    <Compile Include="Apache\Cassandra\SlicePredicate.cs" />
+    <Compile Include="Apache\Cassandra\SliceRange.cs" />
+    <Compile Include="Apache\Cassandra\SuperColumn.cs" />
+    <Compile Include="Apache\Cassandra\TimedOutException.cs" />
+    <Compile Include="Apache\Cassandra\TokenRange.cs" />
+    <Compile Include="Apache\Cassandra\UnavailableException.cs" />
     <Compile Include="AssemblyInfo.cs" />
-    <Compile Include="CqlCommand.cs" />
-    <Compile Include="CqlConnection.cs" />
-    <Compile Include="CqlException.cs" />
+    <Compile Include="CqlClientFactory.cs" />
+    <Compile Include="CqlCommand.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="CqlConnection.cs">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Include="CqlConnectionConfiguration.cs" />
+    <Compile Include="CqlConnectionStringBuilder.cs" />
+    <Compile Include="CqlDataAdapter.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="CqlDataReader.cs" />
+    <Compile Include="CqlException.cs" />
+    <Compile Include="CqlParameter.cs" />
+    <Compile Include="CqlParameterCollection.cs" />
+    <Compile Include="Internal\ActualCqlConnection.cs" />
+    <Compile Include="Internal\ColumnFamilyMetadata.cs" />
+    <Compile Include="CqlCommandBuilder.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Internal\KeyspaceMetadata.cs" />
+    <Compile Include="Internal\Marshal\AsciiType.cs" />
+    <Compile Include="Internal\Marshal\BytesType.cs" />
+    <Compile Include="Internal\Marshal\IMarshaller.cs" />
+    <Compile Include="Internal\Marshal\TypeResolver.cs" />
+    <Compile Include="Internal\Marshal\Utf8Type.cs" />
+    <Compile Include="Internal\Statement.cs" />
+    <Compile Include="Internal\Util.cs" />
+    <Compile Include="Thrift\Collections\THashSet.cs" />
+    <Compile Include="Thrift\Protocol\TBase.cs" />
+    <Compile Include="Thrift\Protocol\TBase64Utils.cs" />
+    <Compile Include="Thrift\Protocol\TBinaryProtocol.cs" />
+    <Compile Include="Thrift\Protocol\TField.cs" />
+    <Compile Include="Thrift\Protocol\TJSONProtocol.cs" />
+    <Compile Include="Thrift\Protocol\TList.cs" />
+    <Compile Include="Thrift\Protocol\TMap.cs" />
+    <Compile Include="Thrift\Protocol\TMessage.cs" />
+    <Compile Include="Thrift\Protocol\TMessageType.cs" />
+    <Compile Include="Thrift\Protocol\TProtocol.cs" />
+    <Compile Include="Thrift\Protocol\TProtocolException.cs" />
+    <Compile Include="Thrift\Protocol\TProtocolFactory.cs" />
+    <Compile Include="Thrift\Protocol\TProtocolUtil.cs" />
+    <Compile Include="Thrift\Protocol\TSet.cs" />
+    <Compile Include="Thrift\Protocol\TStruct.cs" />
+    <Compile Include="Thrift\Protocol\TType.cs" />
+    <Compile Include="Thrift\Server\TServer.cs" />
+    <Compile Include="Thrift\Server\TSimpleServer.cs" />
+    <Compile Include="Thrift\Server\TThreadedServer.cs" />
+    <Compile Include="Thrift\Server\TThreadPoolServer.cs" />
+    <Compile Include="Thrift\TApplicationException.cs" />
+    <Compile Include="Thrift\TProcessor.cs" />
+    <Compile Include="Thrift\Transport\TBufferedTransport.cs" />
+    <Compile Include="Thrift\Transport\TFramedTransport.cs" />
+    <Compile Include="Thrift\Transport\THttpClient.cs" />
+    <Compile Include="Thrift\Transport\TServerSocket.cs" />
+    <Compile Include="Thrift\Transport\TServerTransport.cs" />
+    <Compile Include="Thrift\Transport\TSocket.cs" />
+    <Compile Include="Thrift\Transport\TStreamTransport.cs" />
+    <Compile Include="Thrift\Transport\TTransport.cs" />
+    <Compile Include="Thrift\Transport\TTransportException.cs" />
+    <Compile Include="Thrift\Transport\TTransportFactory.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <BootstrapperPackage Include="Microsoft.Net.Client.3.5">
+      <Visible>False</Visible>
+      <ProductName>.NET Framework 3.5 SP1 Client Profile</ProductName>
+      <Install>false</Install>
+    </BootstrapperPackage>
+    <BootstrapperPackage Include="Microsoft.Net.Framework.3.5.SP1">
+      <Visible>False</Visible>
+      <ProductName>.NET Framework 3.5 SP1</ProductName>
+      <Install>true</Install>
+    </BootstrapperPackage>
+    <BootstrapperPackage Include="Microsoft.Windows.Installer.3.1">
+      <Visible>False</Visible>
+      <ProductName>Windows Installer 3.1</ProductName>
+      <Install>true</Install>
+    </BootstrapperPackage>
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
 </Project>

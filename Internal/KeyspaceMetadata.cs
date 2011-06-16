@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Apache.Cassandra.Cql.Internal
 {
-	class KeyspaceMetadata: IKeyspaceMetadata
+	class KeyspaceMetadata
 	{
 		private string _Name;
 		private IDictionary<string, ColumnFamilyMetadata> _CF;
