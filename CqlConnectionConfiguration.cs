@@ -11,7 +11,19 @@ namespace Apache.Cassandra.Cql
 		public string Host { get; set; }
 		public ushort Port { get; set; }
 		public string DefaultKeyspace { get; set; }
-		public string ConnectionString { get; set; }
+		public string ConnectionString
+		{
+			get
+			{
+				return string.Format("Source={0}:{1}{2}", Host, Port, DefaultKeyspace == "" ? "": ";Keyspace=" + DefaultKeyspace);
+			}
+
+			set
+			{
+				throw new NotImplementedException();
+			}
+		}
+
 		public int Timeout { get; set; }
 		
 		public CqlConnectionConfiguration()
@@ -19,7 +31,6 @@ namespace Apache.Cassandra.Cql
 			Host = "";
 			Port = DEFAULT_CASSANDRA_PORT;
 			DefaultKeyspace = "";
-			ConnectionString = "";
 			Timeout = 0;
 		}
 		

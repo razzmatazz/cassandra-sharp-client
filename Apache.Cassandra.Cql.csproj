@@ -30,6 +30,8 @@
     <IsWebBootstrapper>false</IsWebBootstrapper>
     <UseApplicationTrust>false</UseApplicationTrust>
     <BootstrapperEnabled>true</BootstrapperEnabled>
+    <TargetFrameworkProfile>
+    </TargetFrameworkProfile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -54,6 +56,7 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Data" />
+    <Reference Include="System.Web" />
     <Reference Include="System.XML" />
   </ItemGroup>
   <ItemGroup>
@@ -72,10 +75,12 @@
     <Compile Include="Apache\Cassandra\Constants.cs" />
     <Compile Include="Apache\Cassandra\CounterColumn.cs" />
     <Compile Include="Apache\Cassandra\CounterSuperColumn.cs" />
+    <Compile Include="Apache\Cassandra\CqlMetadata.cs" />
     <Compile Include="Apache\Cassandra\CqlResult.cs" />
     <Compile Include="Apache\Cassandra\CqlResultType.cs" />
     <Compile Include="Apache\Cassandra\CqlRow.cs" />
     <Compile Include="Apache\Cassandra\Deletion.cs" />
+    <Compile Include="Apache\Cassandra\EndpointDetails.cs" />
     <Compile Include="Apache\Cassandra\IndexClause.cs" />
     <Compile Include="Apache\Cassandra\IndexExpression.cs" />
     <Compile Include="Apache\Cassandra\IndexOperator.cs" />
@@ -112,17 +117,18 @@
     <Compile Include="CqlParameter.cs" />
     <Compile Include="CqlParameterCollection.cs" />
     <Compile Include="Internal\ActualCqlConnection.cs" />
-    <Compile Include="Internal\ColumnFamilyMetadata.cs" />
     <Compile Include="CqlCommandBuilder.cs">
       <SubType>Component</SubType>
     </Compile>
-    <Compile Include="Internal\KeyspaceMetadata.cs" />
-    <Compile Include="Internal\Marshal\AsciiType.cs" />
-    <Compile Include="Internal\Marshal\BytesType.cs" />
-    <Compile Include="Internal\Marshal\IMarshaller.cs" />
-    <Compile Include="Internal\Marshal\TypeResolver.cs" />
-    <Compile Include="Internal\Marshal\Utf8Type.cs" />
-    <Compile Include="Internal\Statement.cs" />
+    <Compile Include="Marshal\AsciiType.cs" />
+    <Compile Include="Marshal\BytesType.cs" />
+    <Compile Include="Marshal\Helpers\DateTimePrecise.cs" />
+    <Compile Include="Marshal\Helpers\GuidGenerator.cs" />
+    <Compile Include="Marshal\IMarshaller.cs" />
+    <Compile Include="Marshal\TimeUUIDType.cs" />
+    <Compile Include="Marshal\TypeResolver.cs" />
+    <Compile Include="Marshal\Utf8Type.cs" />
+    <Compile Include="Internal\StatementList.cs" />
     <Compile Include="Internal\Util.cs" />
     <Compile Include="Thrift\Collections\THashSet.cs" />
     <Compile Include="Thrift\Protocol\TBase.cs" />

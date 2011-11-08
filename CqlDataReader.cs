@@ -4,19 +4,31 @@ using System.Linq;
 using System.Text;
 using System.Data;
 using Apache.Cassandra.Cql.Internal;
-using Apache.Cassandra.Cql.Internal.Marshal;
+using Apache.Cassandra.Cql.Marshal;
 using System.Data.Common;
 
 namespace Apache.Cassandra.Cql
 {
-	public class CqlDataReader: DbDataReader
+	/// <summary>
+	/// Provides IDbDataReader view over CqlCommand results.
+	/// 
+	/// Default assumptions for types are:
+	///		key validator:						UTF8Type
+	///		comparator (column name type)		UTF8Type
+	///		value validator (column value type)	UTF8Type
+	/// 
+	///		TODO: support for super column families
+	/// </summary>
+	public class CqlDataReader : DbDataReader
 	{
 		private CqlConnection _Connection;
 		private CqlResult _CqlResult;
 		private bool _Closed;
 		private int _RowIter;
-		private ColumnFamilyMetadata _Cf;
 		private CommandBehavior _CmdBehaviour;
+		private IMarshaller _ColumnNameMarshaller;
+		private IMarshaller _ColumnValueMarshaller;
+		private IMarshaller _KeyMarshaller;
 
 		private CqlRow CurrentRow
 		{
@@ -27,23 +39,28 @@ namespace Apache.Cassandra.Cql
 			}
 		}
 
-		internal CqlDataReader(CqlResult cqlResult, CqlConnection connection, ColumnFamilyMetadata md, CommandBehavior cmdBehaviour)
+		internal CqlDataReader(CqlResult cqlResult, CqlConnection connection, CommandBehavior cmdBehaviour)
 		{
 			_CqlResult = cqlResult;
 			_Connection = connection;
 			_RowIter = -1;
-			_Cf = md;
 			_CmdBehaviour = cmdBehaviour;
 
-			// TODO support super column families
-			if (md.FamilyType == ColumnFamilyMetadata.ColumnFamilyType.Super)
-				throw new NotImplementedException("super column families are not supported yet");
+			ResolveMarshallersFromSchema(cqlResult.Schema);
 
 			if ((cmdBehaviour & CommandBehavior.SchemaOnly) == 0)
 			{
+                // TODO: is this really what we should do here?! what happens with SqlDataReader ?
 				if (!_CqlResult.__isset.rows || _CqlResult.Type != CqlResultType.ROWS)
 					throw new CqlException("non-scalar query has returned a result of non-ROWS type");
 			}
+		}
+
+		private void ResolveMarshallersFromSchema(CqlMetadata cqlMetadata)
+		{
+			_KeyMarshaller = TypeResolver.GetMarshallerForCassandraType(TypeResolver.CassandraType.UTF8);
+			_ColumnNameMarshaller = TypeResolver.GetMarshalledTypeForName(cqlMetadata.Default_name_type);
+			_ColumnValueMarshaller = TypeResolver.GetMarshallerForCassandraType(TypeResolver.CassandraType.UTF8);
 		}
 
 		public override void Close()
@@ -137,18 +154,13 @@ namespace Apache.Cassandra.Cql
 
 		public override bool GetBoolean(int i)
 		{
-			// TODO: add more heuristics here
+			// TODO: add more heuristics to GetBoolean
 			return Convert.ToBoolean(GetValue(i));
 		}
 
 		public override byte GetByte(int i)
 		{
-			if (_Cf.ColumnValueType == TypeResolver.CassandraType.Bytes)
-				return CurrentRow.Columns[i].Value[0];
-			else
-			{
-				return Convert.ToByte(GetValue(i));
-			}
+			return CurrentRow.Columns[i].Value[0];
 		}
 
 		public override long GetBytes(int i, long fieldOffset, byte[] buffer, int bufferoffset, int length)
@@ -174,7 +186,8 @@ namespace Apache.Cassandra.Cql
 
 		public override string GetDataTypeName(int i)
 		{
-			return _Cf.ColumnValueMarshaller.CassandraTypeName;
+			// TODO: this might lie, but we don't have enough metadata to resolve this
+			return new BytesType().CassandraTypeName;
 		}
 
 		public override DateTime GetDateTime(int i)
@@ -196,7 +209,8 @@ namespace Apache.Cassandra.Cql
 
 		public override Type GetFieldType(int i)
 		{
-			return _Cf.ColumnValueMarshaller.MarshalledType;
+			// TODO: this might lie but we don't have enough data 
+			return typeof(byte[]);
 		}
 
 		public override float GetFloat(int i)
@@ -206,16 +220,7 @@ namespace Apache.Cassandra.Cql
 
 		public override Guid GetGuid(int i)
 		{
-			if (_Cf.ColumnValueType == TypeResolver.CassandraType.LexicalUUID
-					|| _Cf.ColumnValueType == TypeResolver.CassandraType.TimeUUID
-					|| _Cf.ColumnValueType == TypeResolver.CassandraType.UUID
-				)
-			{
-				return new Guid(CurrentRow.Columns[i].Value);
-			}
-			else {
-				return new Guid(GetString(i));
-			};
+			return new Guid((byte[])GetValue(i));
 		}
 
 		public override short GetInt16(int i)
@@ -235,12 +240,15 @@ namespace Apache.Cassandra.Cql
 
 		public override string GetName(int i)
 		{
-			return Convert.ToString(_Cf.ColumnNameMarshaller.Unmarshall(CurrentRow.Columns[i].Name));
+			if (i == 0)
+				return "KEY";
+			else
+				return _ColumnNameMarshaller.Unmarshall(CurrentRow.Columns[i].Name).ToString();
 		}
 
 		public override int GetOrdinal(string name)
 		{
-			return _GetColumnNumByName(_Cf.ColumnNameMarshaller.Marshall(name));
+			return _GetColumnNumByName(_ColumnNameMarshaller.Marshall(name));
 		}
 
 		public override string GetString(int i)
@@ -250,13 +258,14 @@ namespace Apache.Cassandra.Cql
 
 		public override object GetValue(int i)
 		{
-			var marshaller = (i == 0) ? _Cf.KeyMarshaller : _Cf.ColumnValueMarshaller;
-			return marshaller.Unmarshall(CurrentRow.Columns[i].Value);
+			byte[] colValue = CurrentRow.Columns[i].Value;
+
+			return _ColumnValueMarshaller.Unmarshall(colValue);
 		}
 
 		public override int GetValues(object[] values)
 		{
-			object[] ourValues = CurrentRow.Columns.Select(c => _Cf.ColumnValueMarshaller.Unmarshall(c.Value)).ToArray();
+			object[] ourValues = CurrentRow.Columns.Select(c => _ColumnValueMarshaller.Unmarshall(c.Value)).ToArray();
 
 			int len = Math.Min(values.Length, ourValues.Length);
 			Array.Copy(ourValues, values, len);
@@ -273,7 +282,7 @@ namespace Apache.Cassandra.Cql
 		{
 			get
 			{
-				return _Cf.ColumnValueMarshaller.Unmarshall(_GetColumnByName(_Cf.ColumnNameMarshaller.Marshall(name)).Value);
+				return _ColumnValueMarshaller.Unmarshall(_GetColumnByName(_ColumnNameMarshaller.Marshall(name)).Value);
 			}
 		}
 
@@ -281,7 +290,7 @@ namespace Apache.Cassandra.Cql
 		{
 			get
 			{
-				return _Cf.ColumnValueMarshaller.Unmarshall(CurrentRow.Columns[i].Value);
+				return _ColumnValueMarshaller.Unmarshall(CurrentRow.Columns[i].Value);
 			}
 		}
 

@@ -8,7 +8,7 @@ namespace Apache.Cassandra.Cql
 	public class CqlCommand: DbCommand
 	{
 		private CqlConnection _Connection;
-		private Statement _Statement;
+		private StatementList _Statements;
 		private bool _DesignTimeVisible;
 		private CqlParameterCollection _DbParams;
 
@@ -27,7 +27,7 @@ namespace Apache.Cassandra.Cql
 		public CqlCommand(string commandText)
 			: this()
 		{
-			_Statement = new Statement(commandText);
+			_Statements = new StatementList(commandText);
 		}
 
 		public CqlCommand(string commandText, CqlConnection connection)
@@ -36,6 +36,18 @@ namespace Apache.Cassandra.Cql
 			_Connection = connection;
 		}
 
+		public CqlParameter SetColumnNameParameter(string name, object value)
+		{
+			// TODO: write this
+			return null;
+		}
+
+		public CqlParameter SetColumnValueParameter(string name, object value)
+		{
+			// TODO: write this
+			return null;
+		}
+		
 		public override void Cancel()
 		{
 			throw new NotSupportedException("Cassandra client does not support canceling on a query");
@@ -45,11 +57,11 @@ namespace Apache.Cassandra.Cql
 		{
 			get
 			{
-				return _Statement.CommandText;
+				return _Statements.CommandText;
 			}
 			set
 			{
-				_Statement = new Statement(value);
+				_Statements = new StatementList(value);
 			}
 		}
 
@@ -100,20 +112,20 @@ namespace Apache.Cassandra.Cql
 		protected override DbDataReader ExecuteDbDataReader(CommandBehavior behavior)
 		{
 			EnsureWeHaveCommandTextAndConnection();
-			return _Connection.ActualConnection.ExecuteStatementWithReader(_Connection, _Statement, behavior, _DbParams);
+			return _Connection.ActualConnection.ExecuteStatementWithReader(_Connection, _Statements, behavior, _DbParams);
 		}
 
 		public override int  ExecuteNonQuery()
 		{
 			EnsureWeHaveCommandTextAndConnection();
-			return _Connection.ActualConnection.ExecuteNonQueryStatement(_Connection, _Statement, _DbParams);
+			return _Connection.ActualConnection.ExecuteNonQueryStatements(_Connection, _Statements, _DbParams);
 		}
 
 		public override object  ExecuteScalar()
 		{
 			EnsureWeHaveCommandTextAndConnection();
 
-			using (var reader = _Connection.ActualConnection.ExecuteStatementWithReader(_Connection, _Statement, CommandBehavior.SingleRow, _DbParams))
+			using (var reader = _Connection.ActualConnection.ExecuteStatementWithReader(_Connection, _Statements, CommandBehavior.SingleRow, _DbParams))
 			{
 				if (!reader.NextResult())
 					throw new CqlException("no records returned for the query to extract scalar from");
@@ -145,7 +157,7 @@ namespace Apache.Cassandra.Cql
 
 		private void EnsureWeHaveCommandTextAndConnection()
 		{
-			if (_Statement == null)
+			if (_Statements == null)
 				throw new CqlException("CommandText is not set on CqlCommand");
 
 			if (_Connection == null || _Connection.State == ConnectionState.Closed)

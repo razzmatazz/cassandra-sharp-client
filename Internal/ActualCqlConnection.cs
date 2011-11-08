@@ -14,14 +14,13 @@ namespace Apache.Cassandra.Cql.Internal
 	{
 		private CqlConnectionConfiguration _Config;
 		private Apache.Cassandra.Cassandra.Client _Client;
-		private KeyspaceMetadata _CurrentKeyspace;
 		private Compression _Compression;
 		private CqlConnection _AssociatedConnection;
+		private bool _KeyspaceMightBeOutOfSync = false;
 
 		public ActualCqlConnection(CqlConnectionConfiguration config)
 		{
 			_Config = config;
-			_CurrentKeyspace = null;
 
 			// TODO: Compression.GZIP does not work!
 			_Compression = Compression.NONE;
@@ -31,6 +30,15 @@ namespace Apache.Cassandra.Cql.Internal
 		{
 			if (_AssociatedConnection != null)
 				throw new InvalidOperationException("already associated with an existing CqlConnection");
+
+			// make sure we are on correct keyspace
+			if (_KeyspaceMightBeOutOfSync)
+			{
+				if (!string.IsNullOrEmpty(_Config.DefaultKeyspace))
+				{
+					ExecuteClientCommand(cl => cl.set_keyspace(_Config.DefaultKeyspace));
+				}
+			}
 
 			_AssociatedConnection = connection;
 		}
@@ -66,95 +74,46 @@ namespace Apache.Cassandra.Cql.Internal
 			_Client.InputProtocol.Transport.Open();
 			if (!_Client.InputProtocol.Transport.Equals(_Client.OutputProtocol.Transport))
 				_Client.OutputProtocol.Transport.Open();
-
-			SetKeyspace(_Config.DefaultKeyspace);
 		}
 
-		public void SetKeyspace(string keyspace)
-		{
-			if (string.IsNullOrEmpty(keyspace))
-			{
-				_CurrentKeyspace = null;
-			}
-			else
-			{
-				_CurrentKeyspace = new KeyspaceMetadata(this, keyspace);
-				ExecuteClientCommand(cl => cl.set_keyspace(_CurrentKeyspace.KeyspaceName));
-			}
-		}
-
-		public void EnsureKeyspaceSelectedFor(Statement st)
-		{
-			if (st.RequiresKeyspaceSelected && _CurrentKeyspace == null)
-				throw new CqlException("no keyspace is selected for connection");
-		}
-
-		public CqlDataReader ExecuteStatementWithReader(CqlConnection connection, Statement st, CommandBehavior cmdBehaviour, CqlParameterCollection stParams)
+		public CqlDataReader ExecuteStatementWithReader(CqlConnection connection, StatementList st, CommandBehavior cmdBehaviour, CqlParameterCollection stParams)
 		{
 			EnsureAssociatedWith(connection);
-			EnsureKeyspaceSelectedFor(st);
 
 			// TODO: what about CommandBehaviour.SingleRow ? should we support this, throw an exception or nop?
 
 			if ((cmdBehaviour & CommandBehavior.KeyInfo) == CommandBehavior.KeyInfo)
 				throw new CqlException("CommandBehavior.KeyInfo is not supported by cassandra client");
 
-			if (!st.IsSelectStatement)
-				throw new CqlException("IDataReader can only be executed on queries of the SELECT type");
-
-			var cfMetadata = _CurrentKeyspace.GetColumnFamilyMetadata(st.ColumnFamilyName);
-
 			// CommandBehavior.SchemaOnly means the user only wants CqlCommand.GetSchemaTable(), don't execute the actual query
 			if ((cmdBehaviour & CommandBehavior.SchemaOnly) == CommandBehavior.SchemaOnly)
-				return new CqlDataReader(null, _AssociatedConnection, cfMetadata, cmdBehaviour);
+				return new CqlDataReader(null, _AssociatedConnection, cmdBehaviour);
 			
 			// TODO: support the CommandBehaviour.SingleRow option when querying
+			_KeyspaceMightBeOutOfSync |= st.CouldChangeKeyspace;
 			CqlResult result = ExecuteClientCommandWithResult(
 				cl => cl.execute_cql_query(Util.CompressQueryString(st.MakeCqlToExecute(stParams), _Compression), _Compression)
 			);
 
-			// resolve column family
-			if (cfMetadata == null)
-			{
-				throw new CqlException(string.Format(
-					"metadata for column family \"{0}\" was not found in the active keyspace (\"{1}\")",
-					st.ColumnFamilyName,
-					_CurrentKeyspace.KeyspaceName
-				));
-			}
+			if (result.__isset.type && result.Type != CqlResultType.ROWS)
+				throw new CqlException("Query string has returned non-ROWS result set and ROWS were expected for CqlDataReader");
 
-			return new CqlDataReader(result, _AssociatedConnection, cfMetadata, cmdBehaviour);
+			return new CqlDataReader(result, _AssociatedConnection, cmdBehaviour);
 		}
 
-		
-		public int ExecuteNonQueryStatement(CqlConnection connection, Statement st, CqlParameterCollection stParams)
+		public int ExecuteNonQueryStatements(CqlConnection connection, StatementList st, CqlParameterCollection stParams)
 		{
 			EnsureAssociatedWith(connection);
-			EnsureKeyspaceSelectedFor(st);
 
-			if (!st.IsNonQueryStatement)
-				throw new InvalidOperationException("CommandText is not a non-query cassandra statement");
+			_KeyspaceMightBeOutOfSync |= st.CouldChangeKeyspace;
+			CqlResult result = ExecuteClientCommandWithResult(
+				cl => cl.execute_cql_query(Util.CompressQueryString(st.MakeCqlToExecute(stParams), _Compression), _Compression)
+			);
 
-			// treat the USE query statement specially
-			if (st.Type == Statement.QueryType.Use)
-			{
-				SetKeyspace(st.Keyspace);
-				return 0;
-			}
-			else
-			{
-				CqlResult result = ExecuteClientCommandWithResult(
-					cl => cl.execute_cql_query(Util.CompressQueryString(st.MakeCqlToExecute(stParams), _Compression), _Compression)
-				);
+			if (!result.__isset.type)
+				throw new CqlException("query result from cassandra has no type set");
 
-				if (!result.__isset.type)
-					throw new CqlException("query results from cassandra has no type set");
-
-				if (result.Type != CqlResultType.INT && result.Type != CqlResultType.VOID)
-					throw new InvalidOperationException("non-query statement should've returned INT or VOID");
-
-				return result.Type == CqlResultType.INT ? result.Num : 0;
-			}
+			return result.Type == CqlResultType.INT ? result.Num : 0;
 		}
 
 		private void EnsureAssociatedWith(CqlConnection connection)
@@ -208,7 +167,6 @@ namespace Apache.Cassandra.Cql.Internal
 				_Client.OutputProtocol.Transport.Close();
 
 				_Client = null;
-				_CurrentKeyspace = null;
 			}
 		}
 

@@ -4,16 +4,15 @@ using System.Linq;
 using System.Text;
 using System.Data;
 using System.Data.Common;
-using Apache.Cassandra.Cql.Internal.Marshal;
+using Apache.Cassandra.Cql.Marshal;
 
 namespace Apache.Cassandra.Cql
 {
 	public class CqlParameter: DbParameter
 	{
 		private string _Name;
-		private object _Value;
+		private string _Value;
 		private DataRowVersion _SourceVersion = DataRowVersion.Default;
-		private IMarshaller _MarshalledType;
 		private CqlParameterCollection _Collection;
 
 		public CqlParameter()
@@ -35,10 +34,10 @@ namespace Apache.Cassandra.Cql
 			_Collection = collection;
 		}
 
-		internal string MarshallToCqlParamValue()
+		internal string AsCqlString()
 		{
 			EnsureValid();
-			return _MarshalledType.MarshallToCqlParamValue(_Value);
+			return "'" + _Value.Replace("'", "''") + "'";
 		}
 
 		private void EnsureValid()
@@ -54,7 +53,8 @@ namespace Apache.Cassandra.Cql
 		{
 			get
 			{
-				return TypeResolver.GetMarshalledTypeForObject(_Value).DbType;
+				// this is not exactly true, but..
+				return DbType.String;
 			}
 			set
 			{
@@ -117,7 +117,7 @@ namespace Apache.Cassandra.Cql
 		{
 			get
 			{
-				return TypeResolver.GetMarshalledTypeForObject(_Value).Marshall(_Value).Length;
+				return _Value.Length;
 			}
 			set
 			{
@@ -170,11 +170,7 @@ namespace Apache.Cassandra.Cql
 			}
 			set
 			{
-				_MarshalledType = TypeResolver.GetMarshalledTypeForObject(value);
-				if (_MarshalledType == null)
-					throw new ArgumentException("cassandra cql client does not support parameter value type of " + value.GetType().Name);
-
-				_Value = value;
+				_Value = (string)value;
 			}
 		}
 	}
