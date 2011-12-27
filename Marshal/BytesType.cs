@@ -38,7 +38,8 @@ namespace Apache.Cassandra.Cql.Marshal
 
 		public string CassandraTypeName
 		{
-			get { return "org.apache.cassandra.db.marshal.BytesType"; }
+			//get { return "org.apache.cassandra.db.marshal.BytesType"; }
+			get { return "BytesType"; }
 		}
 
 		public DbType DbType

@@ -37,7 +37,8 @@ namespace Apache.Cassandra.Cql.Marshal
 
 		public string CassandraTypeName
 		{
-			get { return "org.apache.cassandra.db.marshal.AsciiType"; }
+			//get { return "org.apache.cassandra.db.marshal.AsciiType"; }
+			get { return "AsciiType"; }
 		}
 
 		public DbType DbType

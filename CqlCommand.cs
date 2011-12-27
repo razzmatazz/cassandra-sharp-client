@@ -161,7 +161,7 @@ namespace Apache.Cassandra.Cql
 				throw new CqlException("CommandText is not set on CqlCommand");
 
 			if (_Connection == null || _Connection.State == ConnectionState.Closed)
-				throw new InvalidOperationException("connection is not set on CqlCommand");
+				throw new InvalidOperationException("connection is not open or is not set on CqlCommand");
 		}
 
 		protected override DbConnection DbConnection

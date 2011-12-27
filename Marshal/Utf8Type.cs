@@ -26,6 +26,9 @@ namespace Apache.Cassandra.Cql.Marshal
 
 		public object Unmarshall(byte[] bytes)
 		{
+			if (bytes == null)
+				return null;
+
 			return Encoding.UTF8.GetString(bytes);
 		}
 
@@ -36,7 +39,8 @@ namespace Apache.Cassandra.Cql.Marshal
 
 		public string CassandraTypeName
 		{
-			get { return "org.apache.cassandra.db.marshal.UTF8Type"; }
+			//get { return "org.apache.cassandra.db.marshal.UTF8Type"; }
+			get { return "UTF8Type"; }
 		}
 
 		public DbType DbType

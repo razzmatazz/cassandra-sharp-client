@@ -58,9 +58,9 @@ namespace Apache.Cassandra.Cql
 
 		private void ResolveMarshallersFromSchema(CqlMetadata cqlMetadata)
 		{
-			_KeyMarshaller = TypeResolver.GetMarshallerForCassandraType(TypeResolver.CassandraType.UTF8);
+			_KeyMarshaller = new Marshal.BytesType();
 			_ColumnNameMarshaller = TypeResolver.GetMarshalledTypeForName(cqlMetadata.Default_name_type);
-			_ColumnValueMarshaller = TypeResolver.GetMarshallerForCassandraType(TypeResolver.CassandraType.UTF8);
+			_ColumnValueMarshaller = TypeResolver.GetMarshalledTypeForName(cqlMetadata.Default_value_type);
 		}
 
 		public override void Close()
@@ -117,6 +117,12 @@ namespace Apache.Cassandra.Cql
 		public override bool NextResult()
 		{
 			EnsureNotClosed();
+			return false;
+		}
+
+		public override bool Read()
+		{
+			EnsureNotAtTheEnd();
 
 			if (_CqlResult == null)
 				return false;
@@ -128,12 +134,6 @@ namespace Apache.Cassandra.Cql
 				return false;
 
 			_RowIter += 1;
-			return true;
-		}
-
-		public override bool Read()
-		{
-			EnsureNotAtTheEnd();
 			return true;
 		}
 
@@ -149,7 +149,19 @@ namespace Apache.Cassandra.Cql
 
 		public override int FieldCount
 		{
-			get { return CurrentRow.Columns.Count; }
+			get {
+				var count = CurrentRow.Columns.Count;
+
+				// we always have key available as a column
+				if (count == 0)
+					return 1;
+
+				// we always have first column emulated from 'key' if not retrieved from database
+				if (!FirstColumnLooksLikeKey())
+					count += 1;
+
+				return count;
+			}
 		}
 
 		public override bool GetBoolean(int i)
@@ -166,7 +178,11 @@ namespace Apache.Cassandra.Cql
 		public override long GetBytes(int i, long fieldOffset, byte[] buffer, int bufferoffset, int length)
 		{
 			var colValue = CurrentRow.Columns[i].Value;
-			long len = Math.Max(length, colValue.Length);
+
+			if (fieldOffset > colValue.Length)
+				throw new ArgumentException("fieldOffset");
+
+			long len = Math.Min(length, colValue.Length - fieldOffset);
 			Array.Copy(colValue, 0, buffer, bufferoffset, len);
 			return len;
 		}
@@ -220,7 +236,8 @@ namespace Apache.Cassandra.Cql
 
 		public override Guid GetGuid(int i)
 		{
-			return new Guid((byte[])GetValue(i));
+			var obj = GetValue(i);
+			return new Guid(BitConverter.ToString((byte[])obj).Replace("-", string.Empty));
 		}
 
 		public override short GetInt16(int i)
@@ -240,10 +257,30 @@ namespace Apache.Cassandra.Cql
 
 		public override string GetName(int i)
 		{
-			if (i == 0)
-				return "KEY";
-			else
-				return _ColumnNameMarshaller.Unmarshall(CurrentRow.Columns[i].Name).ToString();
+			if (!FirstColumnLooksLikeKey())
+			{
+				if (i == 0)
+					return "KEY";
+
+				i -= 1;
+			}
+
+			return _ColumnNameMarshaller.Unmarshall(CurrentRow.Columns[i].Name).ToString();
+		}
+
+		private bool FirstColumnLooksLikeKey()
+		{
+			if (CurrentRow.Columns.Count == 0)
+				return false;
+
+			var firstCol = CurrentRow.Columns[0];
+			return
+				firstCol.Timestamp == -1
+				&& firstCol.Ttl == 0
+				&& firstCol.Name.Length == 3
+				&& firstCol.Name[0] == 'K'
+				&& firstCol.Name[1] == 'E'
+				&& firstCol.Name[2] == 'Y';
 		}
 
 		public override int GetOrdinal(string name)
@@ -253,19 +290,45 @@ namespace Apache.Cassandra.Cql
 
 		public override string GetString(int i)
 		{
-			return Convert.ToString(GetValue(i));
+			var obj = GetValue(i);
+			if (obj is byte[])
+				return Encoding.UTF8.GetString((byte[])obj);
+			else
+				return Convert.ToString(obj);
 		}
 
 		public override object GetValue(int i)
 		{
-			byte[] colValue = CurrentRow.Columns[i].Value;
+			if (FieldCount == 0)
+				throw new ArgumentOutOfRangeException("no fields in this row");
 
-			return _ColumnValueMarshaller.Unmarshall(colValue);
+			IMarshaller marshaller;
+
+			var actualCol = i;
+
+			if (!FirstColumnLooksLikeKey())
+			{
+				if (actualCol == 0)
+					return _KeyMarshaller.Unmarshall(CurrentRow.Key);
+
+				actualCol -= 1;
+
+				marshaller = _ColumnValueMarshaller;
+			}
+			else
+			{
+				marshaller = actualCol == 0 ? _KeyMarshaller : _ColumnValueMarshaller;
+			}
+
+			byte[] colValue = CurrentRow.Columns[actualCol].Value;
+			return marshaller.Unmarshall(colValue);
 		}
 
 		public override int GetValues(object[] values)
 		{
-			object[] ourValues = CurrentRow.Columns.Select(c => _ColumnValueMarshaller.Unmarshall(c.Value)).ToArray();
+			object[] ourValues = new object[] { _KeyMarshaller.Unmarshall(CurrentRow.Key) }.Union(
+				CurrentRow.Columns.Select(c => _ColumnValueMarshaller.Unmarshall(c.Value))
+			).ToArray();
 
 			int len = Math.Min(values.Length, ourValues.Length);
 			Array.Copy(ourValues, values, len);

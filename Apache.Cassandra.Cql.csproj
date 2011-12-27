@@ -125,7 +125,8 @@
     <Compile Include="Marshal\Helpers\DateTimePrecise.cs" />
     <Compile Include="Marshal\Helpers\GuidGenerator.cs" />
     <Compile Include="Marshal\IMarshaller.cs" />
-    <Compile Include="Marshal\TimeUUIDType.cs" />
+    <Compile Include="Marshal\LongMarshaller.cs" />
+    <Compile Include="Marshal\TimeUUIDMarshaller.cs" />
     <Compile Include="Marshal\TypeResolver.cs" />
     <Compile Include="Marshal\Utf8Type.cs" />
     <Compile Include="Internal\StatementList.cs" />
@@ -163,6 +164,8 @@
     <Compile Include="Thrift\Transport\TTransport.cs" />
     <Compile Include="Thrift\Transport\TTransportException.cs" />
     <Compile Include="Thrift\Transport\TTransportFactory.cs" />
+    <Compile Include="Types\TimeUuid.cs" />
+    <Compile Include="Types\TimeUuidRange.cs" />
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include="Microsoft.Net.Client.3.5">

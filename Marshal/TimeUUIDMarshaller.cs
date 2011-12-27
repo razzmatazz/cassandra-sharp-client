@@ -7,7 +7,7 @@ using Apache.Cassandra.Cql.Marshal.Helpers;
 
 namespace Apache.Cassandra.Cql.Marshal
 {
-	public class TimeUUIDType : IMarshaller
+	public class TimeUUIDMarshaller : IMarshaller
 	{
 		public object ToValue(object obj)
 		{
@@ -38,12 +38,9 @@ namespace Apache.Cassandra.Cql.Marshal
 
 		public string CassandraTypeName
 		{
-			get { return "org.apache.cassandra.db.marshal.TimeUUIDType"; }
+			//get { return "org.apache.cassandra.db.marshal.TimeUUIDType"; }
+			get { return "TimeUUIDType"; }
 		}
 
-        public static Guid FromDateTime(DateTime datetime)
-        {
-            return GuidGenerator.GenerateTimeBasedGuid(datetime);
-        }
 	}
 }

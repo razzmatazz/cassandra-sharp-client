@@ -42,7 +42,8 @@ namespace Apache.Cassandra.Cql.Marshal
 				Type = CassandraType.Bytes,
 				Marshaller = new BytesType()
 			},
-			new TypeDescription() { Type = CassandraType.TimeUUID, Marshaller = new TimeUUIDType() }
+			new TypeDescription() { Type = CassandraType.TimeUUID, Marshaller = new TimeUUIDMarshaller() },
+			new TypeDescription() { Type = CassandraType.Long, Marshaller = new LongMarshaller() }
 		};
 
 		public static IMarshaller GetMarshallerForCassandraType(CassandraType type)
@@ -62,6 +63,8 @@ namespace Apache.Cassandra.Cql.Marshal
 
 		public static IMarshaller GetMarshalledTypeForName(string name)
 		{
+			name = name.Split('.').Last();
+
 			return GetTypeDescriptionForName(name).Marshaller;
 		}
 

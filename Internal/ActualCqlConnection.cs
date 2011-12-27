@@ -16,11 +16,12 @@ namespace Apache.Cassandra.Cql.Internal
 		private Apache.Cassandra.Cassandra.Client _Client;
 		private Compression _Compression;
 		private CqlConnection _AssociatedConnection;
-		private bool _KeyspaceMightBeOutOfSync = false;
+		private bool _KeyspaceMightBeOutOfSync;
 
 		public ActualCqlConnection(CqlConnectionConfiguration config)
 		{
 			_Config = config;
+			_KeyspaceMightBeOutOfSync = true;
 
 			// TODO: Compression.GZIP does not work!
 			_Compression = Compression.NONE;

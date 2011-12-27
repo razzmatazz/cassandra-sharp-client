@@ -81,6 +81,11 @@ namespace Apache.Cassandra.Cql.Marshal.Helpers
             return GenerateTimeBasedGuid(dateTime.UtcNow.Ticks, RandomNode);
         }
 
+		public static Guid GenerateTimeBasedGuid(long dateTimeTicks)
+		{
+			return GenerateTimeBasedGuid(dateTimeTicks, RandomNode);
+		}
+
         /// <summary>
         /// Generate a Time based Guid using given Datetime (converted into UtcNow first)
         /// </summary>
